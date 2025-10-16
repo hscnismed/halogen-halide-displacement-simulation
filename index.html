@@ -496,6 +496,50 @@
         });
     });
 
+    // === TOUCH SUPPORT for mobile/tablets ===
+    elementTubes.forEach(el => {
+        let touchPreview = null;
+        let currentTouchId = null;
+
+        el.addEventListener('touchstart', e => {
+            const touch = e.touches[0];
+            currentTouchId = touch.identifier;
+
+            touchPreview = createPreviewFromElement(el);
+            touchPreview.style.left = (touch.pageX - 30) + 'px';
+            touchPreview.style.top = (touch.pageY - 90) + 'px';
+            touchPreview.style.transform = 'rotate(-6deg) scale(1.02)';
+        });
+
+        el.addEventListener('touchmove', e => {
+            const touch = Array.from(e.touches).find(t => t.identifier === currentTouchId);
+            if (!touch || !touchPreview) return;
+            e.preventDefault(); // prevent scrolling
+            touchPreview.style.left = (touch.pageX - 30) + 'px';
+            touchPreview.style.top = (touch.pageY - 90) + 'px';
+        });
+
+        el.addEventListener('touchend', e => {
+            if (!touchPreview) return;
+            const touch = e.changedTouches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            const halide = target && target.closest && target.closest('.halide');
+            if (halide) {
+                pourAnimation(halide, () => mix(el.dataset.element, el.dataset.color, halide));
+            }
+            touchPreview.remove();
+            touchPreview = null;
+            currentTouchId = null;
+        });
+
+        el.addEventListener('touchcancel', () => {
+            if (touchPreview) touchPreview.remove();
+            touchPreview = null;
+            currentTouchId = null;
+        });
+    });
+
+
     function pourAnimation(targetTube, callback) {
         const anim = document.createElement('div');
         anim.className = 'pour-animation';
