@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Halogen Displacement Simulation</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            background: lightgray;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 18px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        /* single row container: elements on the left, halides on the right */
+        .row {
+            width: 95%;
+            max-width: 1000px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-around;
+            /* push groups to edges */
+            gap: 18px;
+            margin-top: 10px;
+        }
+
+        /* groups are horizontal sets of tubes */
+        .group {
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+        }
+
+        .tube {
+            position: relative;
+            width: 60px;
+            height: 250px;
+            border: 2px solid #666;
+            border-radius: 0 0 30px 30px;
+            /* flat top */
+            background: none;
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: center;
+            overflow: visible;
+            user-select: none;
+        }
+
+        .liquid {
+            width: 100%;
+            border-radius: 0 0 35px 35px;
+            transition: all 0.45s ease;
+            box-sizing: border-box;
+        }
+
+        .base-label {
+            position: absolute;
+            bottom: -60px;
+            width: 100%;
+            text-align: center;
+            font-weight: 700;
+            font-size: 13px;
+            color: #222;
+            text-shadow: 0 0 3px #fff;
+        }
+
+        .inside-label {
+            position: absolute;
+            top: 8px;
+            left: 6px;
+            right: 6px;
+            font-size: 12px;
+            line-height: 1.1;
+            text-align: center;
+            /* background: rgba(255, 255, 255, 0.92); */
+            padding: 2px 2px;
+            /* border-radius: 6px; */
+            /* box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05); */
+            display: none;
+            /* default hidden */
+            z-index: 6;
+            pointer-events: none;
+        }
+
+        .button-row {
+            margin-top: 60px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 0;
+            background: #2f80ed;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #1765d1;
+        }
+
+        .drag-preview {
+            position: absolute;
+            pointer-events: none;
+            z-index: 9999;
+            width: 60px;
+            height: 180px;
+            border: 2px solid #666;
+            border-radius: 0 0 30px 30px;
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: center;
+            transform-origin: center center;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
+        }
+
+        .pour-animation {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.5);
+            animation: pour 0.8s ease forwards;
+            border-radius: 0 0 30px 30px;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        @keyframes pour {
+            0% {
+                transform: rotate(0deg) scaleY(0);
+                opacity: 1;
+            }
+
+            50% {
+                transform: rotate(-18deg) scaleY(1.05);
+                opacity: 0.85;
+            }
+
+            100% {
+                transform: rotate(0deg) scaleY(1);
+                opacity: 0;
+            }
+        }
+
+        /* small helper to show inside label */
+        .show-inside .inside-label {
+            display: block !important;
+        }
+
+        /* responsive small screens */
+        @media (max-width:640px) {
+            .row {
+                flex-direction: column;
+                gap: 24px;
+                align-items: center;
+            }
+
+            .group {
+                gap: 16px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Halogen Displacement Simulation</h1>
+
+    <div class="row" id="tube-row">
+        <!-- ELEMENT TUBES (LEFT) -->
+        <div class="group" id="elements-group" aria-label="Element tubes (left)">
+            <div class="tube element" draggable="true" data-element="Cl₂" data-color="#a4ebc5"
+                title="Double-click or drag">
+                <div class="liquid" style="height:50%; background:#a4ebc5"></div>
+                <div class="base-label">Chlorine (Cl₂)</div>
+            </div>
+
+            <div class="tube element" draggable="true" data-element="Br₂" data-color="#b96c28"
+                title="Double-click or drag">
+                <div class="liquid" style="height:50%; background:#b96c28"></div>
+                <div class="base-label">Bromine (Br₂)</div>
+            </div>
+
+            <div class="tube element" draggable="true" data-element="I₂" data-color="#6b2c91"
+                title="Double-click or drag">
+                <div class="liquid" style="height:50%; background:#6b2c91"></div>
+                <div class="base-label">Iodine (I₂)</div>
+            </div>
+        </div>
+
+        <!-- HALIDE TUBES (RIGHT) -->
+        <div class="group" id="halides-group" aria-label="Halide solutions (right)">
+            <div class="tube halide" data-halide="KCl" data-contained="Cl₂">
+                <div class="liquid" style="height:40%; background:#f9f9f9; opacity:50%"></div>
+                <div class="inside-label"></div>
+                <div class="base-label">Chlorine compound (KCl)</div>
+            </div>
+
+            <div class="tube halide" data-halide="KBr" data-contained="Br₂">
+                <div class="liquid" style="height:40%; background:#f9f9f9; opacity:50%"></div>
+                <div class="inside-label"></div>
+                <div class="base-label">Bromine compound (KBr)</div>
+            </div>
+
+            <div class="tube halide" data-halide="KI" data-contained="I₂">
+                <div class="liquid" style="height:40%; background:#f9f9f9; opacity:50%"></div>
+                <div class="inside-label"></div>
+                <div class="base-label">Iodine compound (KI)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="button-row">
+        <button id="undo">Undo</button>
+        <button id="reset">Reset</button>
+        <button id="toggle-names">Show Inside Names</button>
+    </div>
+    <div class="button-row">
+        <p>© UP NISMED 2025</p>
+    </div>
+
+    <script>
+        /* ====== configuration ====== */
+        const halogenColors = { 'Cl₂': '#a4ebc5', 'Br₂': '#b96c28', 'I₂': '#6b2c91' };
+        const reactivity = ['Cl₂', 'Br₂', 'I₂']; // stronger -> weaker
+        const history = [];
+        let showInside = false; // default hidden
+
+        /* ---------- Utilities ---------- */
+
+        // Normalize strings so comparisons are consistent.
+        // Replaces subscript-2 (₂) with plain '2' for internal comparisons.
+        function normalizeDiatomic(str) {
+            return String(str).replace(/\u2082/g, '2'); // Cl₂ -> Cl2
+        }
+
+        // Return the element symbol without the 2, e.g. "Cl₂" or "Cl2" -> "Cl"
+        function diatomicSymbol(diatomic) {
+            return normalizeDiatomic(diatomic).replace(/2$/, ''); // "Cl2" -> "Cl"
+        }
+
+        // Return the diatomic with proper subscript '₂' for display: "Cl" -> "Cl₂"
+        function toDiatomicDisplay(sym) {
+            // If user passed "Cl2" already, convert '2' to subscript; if "Cl" append subscript.
+            const normalized = normalizeDiatomic(sym);
+            if (normalized.endsWith('2')) {
+                return normalized.replace(/2$/, '\u2082'); // "Cl2" -> "Cl₂"
+            }
+            return normalized + '\u2082'; // "Cl" -> "Cl₂"
+        }
+
+        // Extract the metal portion from a salt string reliably.
+        // Works for salts like "KCl", "KBr", "KI", even if someone uses "KCl2" etc.
+        function extractMetal(salt) {
+            // remove any trailing known halogen symbols (with or without '2' subscript)
+            // match Cl, Br, I possibly followed by '2' or subscript '₂'
+            return String(salt).replace(/(Cl₂|Cl2|Cl|Br₂|Br2|Br|I₂|I2|I)$/, '');
+        }
+
+        /* ---------- Mixing (fixed) ---------- */
+
+        function mix(element, color, halideTube) {
+            // element: e.g. 'Cl₂' (display form)
+            // halideTube.dataset.halide: e.g. 'KBr'
+            // halideTube.dataset.contained: e.g. 'Br₂' (display form)
+
+            const halide = halideTube.dataset.halide;      // "KBr"
+            const contained = halideTube.dataset.contained; // "Br₂"
+            const liquid = halideTube.querySelector('.liquid');
+            const insideLabel = halideTube.querySelector('.inside-label');
+            const baseLabel = halideTube.querySelector('.base-label');
+
+            // Save previous state for undo
+            history.push({
+                tube: halideTube,
+                prevColor: liquid.style.background || '#f9f9f9',
+                prevHeight: parseInt(liquid.style.height || '40'),
+                prevInside: insideLabel.innerHTML || ''
+            });
+
+            // increase visual "volume"
+            const prevH = parseInt(liquid.style.height || '40');
+            liquid.style.height = Math.min(prevH + 10, 90) + '%';
+
+            // Decide displacement using normalized diatomic tokens:
+            // Use the same token set as reactivity: reactivity = ['Cl₂','Br₂','I₂']
+            const normElement = normalizeDiatomic(element);   // "Cl2"
+            const normContained = normalizeDiatomic(contained); // "Br2"
+
+            // find indices in the reactivity array (normalize array entries similarly)
+            const normReactivity = reactivity.map(r => normalizeDiatomic(r)); // e.g. ["Cl2","Br2","I2"]
+            const idxElement = normReactivity.indexOf(normElement);
+            const idxContained = normReactivity.indexOf(normContained);
+
+            const canDisplace = (idxElement !== -1 && idxContained !== -1) && (idxElement < idxContained);
+
+            let contentsText = '';
+            if (canDisplace) {
+                // Example: Cl₂ + KBr -> KCl + Br₂
+                const metal = extractMetal(halide);          // "K"
+                const newAnion = diatomicSymbol(element);    // "Cl"
+                const newSalt = metal + newAnion;            // "KCl"
+                const displacedDiatomic = toDiatomicDisplay(diatomicSymbol(contained)); // "Br₂"
+
+                // show color of the displaced diatomic (it gives the visible color)
+                liquid.style.background = halogenColors[displacedDiatomic] || color || liquid.style.background;
+
+                // Build contents label (note: we always show the added starting element on top)
+                contentsText = `Added: ${toDiatomicDisplay(diatomicSymbol(element))}<br><br>Contents: ${newSalt} and ${displacedDiatomic}`;
+            } else {
+                // No reaction: the added element remains present (its color shows)
+                liquid.style.background = color || halogenColors[element] || liquid.style.background;
+
+                // show the element display (Cl₂ with subscript) and the unchanged salt
+                contentsText = `Added: ${toDiatomicDisplay(diatomicSymbol(element))}<br><br>Contents: ${halide} and ${toDiatomicDisplay(diatomicSymbol(element))}`;
+            }
+
+            // Update inside label and its visibility state (toggle controls display elsewhere)
+            insideLabel.innerHTML = contentsText;
+            insideLabel.style.display = showInside ? 'block' : 'none';
+
+            // Ensure the base label remains the original halide (show anion as superscript minus)
+            // e.g. "KCl (Cl⁻)"
+            const anionSymbol = diatomicSymbol(contained); // "Br"
+            // baseLabel.textContent = `${halide} (${anionSymbol}⁻)`;
+        }
+
+
+        /* ====== DOM references ====== */
+        const elementTubes = document.querySelectorAll('.element');
+        const halideTubes = document.querySelectorAll('.halide');
+        const toggleBtn = document.getElementById('toggle-names');
+
+        /* ====== Drag preview and dblclick pickup support ====== */
+        /*
+         Supports:
+          - native dragstart/dragend (works on desktop)
+          - double-click pickup: dblclick to create a preview that follows mouse; mouseup performs drop
+        */
+
+        let manualPreview = null;
+        let manualPickedElement = null; // data-element string like 'Cl₂'
+        let manualPickedColor = null;
+        let mouseMoveHandler = null;
+        let mouseUpHandler = null;
+
+        function createPreviewFromElement(sourceEl) {
+            const preview = sourceEl.cloneNode(true);
+            preview.classList.add('drag-preview');
+            preview.style.position = 'absolute';
+            preview.style.left = '-9999px';
+            preview.style.top = '-9999px';
+            document.body.appendChild(preview);
+            return preview;
+        }
+
+        /* element dblclick starts manual pickup */
+        elementTubes.forEach(el => {
+            // native dragstart preview (for regular drag & drop)
+            el.addEventListener('dragstart', e => {
+                e.dataTransfer.setData('element', el.dataset.element);
+                e.dataTransfer.setData('color', el.dataset.color);
+                // create a cloned visual preview near the cursor for better feedback
+                const dragPreview = createPreviewFromElement(el);
+                // position initial preview
+                dragPreview.style.left = (e.pageX - 30) + 'px';
+                dragPreview.style.top = (e.pageY - 90) + 'px';
+                // also follow mouse while dragging (not all browsers show the cloned element as native drag image)
+                function follow(e2) { dragPreview.style.left = (e2.pageX - 30) + 'px'; dragPreview.style.top = (e2.pageY - 90) + 'px'; }
+                document.addEventListener('mousemove', follow);
+                el._drag_preview = dragPreview;
+                el._drag_follow = follow;
+            });
+            el.addEventListener('dragend', () => {
+                if (el._drag_preview) { el._drag_preview.remove(); el._drag_preview = null; document.removeEventListener('mousemove', el._drag_follow); el._drag_follow = null; }
+            });
+
+            // manual dblclick pickup (useful for touch-like or explicit pick-up)
+            el.addEventListener('dblclick', e => {
+                e.preventDefault();
+                if (manualPreview) return; // already picking
+                manualPickedElement = el.dataset.element;
+                manualPickedColor = el.dataset.color;
+                manualPreview = createPreviewFromElement(el);
+                manualPreview.style.left = (e.pageX - 30) + 'px';
+                manualPreview.style.top = (e.pageY - 90) + 'px';
+                manualPreview.style.transform = 'rotate(-6deg) scale(1.02)';
+
+                // follow mouse
+                mouseMoveHandler = (ev) => {
+                    manualPreview.style.left = (ev.pageX - 30) + 'px';
+                    manualPreview.style.top = (ev.pageY - 90) + 'px';
+                };
+                mouseUpHandler = (ev) => {
+                    // detect element under cursor
+                    const target = document.elementFromPoint(ev.clientX, ev.clientY);
+                    // find closest ancestor .halide
+                    const halide = target && target.closest && target.closest('.halide');
+                    if (halide) {
+                        // perform pour
+                        pourAnimation(halide, () => mix(manualPickedElement, manualPickedColor, halide));
+                    }
+                    // cleanup handlers/preview
+                    if (manualPreview) { manualPreview.remove(); manualPreview = null; }
+                    manualPickedElement = null;
+                    manualPickedColor = null;
+                    document.removeEventListener('mousemove', mouseMoveHandler);
+                    document.removeEventListener('mouseup', mouseUpHandler);
+                    mouseMoveHandler = null; mouseUpHandler = null;
+                };
+
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+            });
+        });
+
+        /* halide drop handlers for native drag/drop */
+        halideTubes.forEach(tube => {
+            tube.addEventListener('dragover', e => e.preventDefault());
+            tube.addEventListener('drop', e => {
+                e.preventDefault();
+                const element = e.dataTransfer.getData('element');
+                const color = e.dataTransfer.getData('color');
+                pourAnimation(tube, () => mix(element, color, tube));
+            });
+        });
+
+        /* pour visual */
+        function pourAnimation(targetTube, callback) {
+            const anim = document.createElement('div');
+            anim.className = 'pour-animation';
+            targetTube.appendChild(anim);
+            setTimeout(() => {
+                if (anim.parentNode) anim.parentNode.removeChild(anim);
+                try { callback(); } catch (err) { console.error(err); }
+            }, 760);
+        }
+
+        /* mixing / chemistry logic */
+        function mix(element, color, halideTube) {
+            // element: e.g. 'Cl₂'
+            const halide = halideTube.dataset.halide; // e.g. 'KI'
+            const contained = halideTube.dataset.contained; // e.g. 'I₂'
+            const liquid = halideTube.querySelector('.liquid');
+            const insideLabel = halideTube.querySelector('.inside-label');
+            const baseLabel = halideTube.querySelector('.base-label');
+
+            // save for undo
+            history.push({
+                tube: halideTube,
+                prevColor: liquid.style.background || '#f9f9f9',
+                prevHeight: parseInt(liquid.style.height || '40'),
+                prevInside: insideLabel.innerHTML || ''
+            });
+
+            // visual volume increase
+            const prevH = parseInt(liquid.style.height || '40');
+            liquid.style.height = Math.min(prevH + 10, 90) + '%';
+
+            // determine displacement
+            const displaced = contained; // e.g. 'I₂'
+            const canDisplace = reactivity.indexOf(normalizeDiatomic(element)) < reactivity.indexOf(normalizeDiatomic(displaced));
+
+            let contentsText = '';
+            if (canDisplace) {
+                // metal + new anion (use first char of element symbol for anion)
+                const metal = halide.replace(/(Cl|Br|I)$/, '');
+                const newAnion = diatomicSymbol(element); // 'Cl'
+                const newSalt = metal + newAnion;
+                // color shows displaced diatomic (that gives color)
+                liquid.style.background = halogenColors[displaced] || color;
+                contentsText = `Added: ${element}<br><br>Contents: ${newSalt} and ${displaced}`;
+            } else {
+                // no displacement - added element present
+                liquid.style.background = color || halogenColors[element] || '#ddd';
+                contentsText = `Added: ${element}<br><br>Contents: ${halide} and ${element}`;
+            }
+
+            // set inside label text and visibility per toggle
+            insideLabel.innerHTML = contentsText;
+            insideLabel.style.display = showInside ? 'block' : 'none';
+
+            // ensure base label always shows original halide (unchanged)
+            // baseLabel.textContent = halide + ` (${makeSub2(diatomicSymbol(contained)) ? diatomicSymbol(contained).replace(/Cl|Br|I/g, match => match + '⁻') : ''})`;
+            // (above: base label shows e.g. KCl (Cl⁻))
+        }
+
+        /* undo, reset, toggle */
+        document.getElementById('undo').addEventListener('click', () => {
+            const last = history.pop();
+            if (!last) return;
+            const liquid = last.tube.querySelector('.liquid');
+            const insideLabel = last.tube.querySelector('.inside-label');
+            liquid.style.background = last.prevColor || '#f9f9f9';
+            liquid.style.height = (last.prevHeight || 40) + '%';
+            insideLabel.innerHTML = last.prevInside || '';
+            insideLabel.style.display = showInside ? 'block' : 'none';
+        });
+
+        document.getElementById('reset').addEventListener('click', () => {
+            history.length = 0;
+            halideTubes.forEach(t => {
+                const li = t.querySelector('.liquid');
+                const ins = t.querySelector('.inside-label');
+                li.style.height = '40%';
+                li.style.background = '#f9f9f9';
+                ins.innerHTML = '';
+                ins.style.display = 'none';
+            });
+            showInside = false;
+            toggleBtn.textContent = 'Show Inside Names';
+        });
+
+        toggleBtn.addEventListener('click', () => {
+            showInside = !showInside;
+            halideTubes.forEach(t => {
+                const ins = t.querySelector('.inside-label');
+                ins.style.display = showInside ? 'block' : 'none';
+            });
+            toggleBtn.textContent = showInside ? 'Hide Inside Names' : 'Show Inside Names';
+        });
+
+        /* initial base label formatting (show anion as superscript minus) */
+        // halideTubes.forEach(t => {
+        //     const contained = t.dataset.contained; // e.g. 'Cl₂'
+        //     const symbol = diatomicSymbol(contained); // 'Cl'
+        //     const base = t.dataset.halide + ` (${symbol}⁻)`;
+        //     t.querySelector('.base-label').textContent = base;
+        // });
+    </script>
+</body>
+
+</html>
